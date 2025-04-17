@@ -66,9 +66,8 @@ def Model(Buffer = 0):  # Model
             volume_file = volume_file_txt.read()
             volume_file = volume_file.split()
             volume = volume_file[-1].strip()
-            area = volume_file[-3].replace(",","").strip()
 
-        output_file.write(f"{Buffer} {volume} {area}\n")
+        output_file.write(f"{Buffer} {volume}\n")
     
 
 if __name__ == '__main__':
