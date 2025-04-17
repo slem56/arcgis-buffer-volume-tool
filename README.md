@@ -3,6 +3,7 @@
 ## Description
 
 This is an ArcGIS automation tool that filters features affecting the watertable depth and calculates surface volume from interpolated depth data. The tool uses a series of buffer distances to filter out nearby features that affect water table depth and helps identify the optimal buffer distance for accurate water table depth analysis.
+This tool was created using ArcGIS ModelBuilder and modified for automation.
 
 ## Key Features
 - **Watertable Depth Interpolation**: Uses Inverse Distance Weighting (IDW) to interpolate watertable depths.
