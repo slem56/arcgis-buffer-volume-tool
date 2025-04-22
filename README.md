@@ -2,21 +2,31 @@
 
 ## Description
 
-This is an ArcGIS automation tool that filters features affecting the watertable depth and calculates surface volume from interpolated depth data. The tool uses a series of buffer distances to filter out nearby features that affect water table depth and helps identify the optimal buffer distance for accurate water table depth analysis. 
+This is an ArcGIS automation tool that filters channels affecting the watertable depth and calculates surface volume from interpolated depth data. The tool uses a series of buffer distances to filter out nearby channels (specifically `SUPPLY` or `ESCAPE` channels) and helps identify the optimal buffer distance for accurate water table depth analysis.  
 
-This tool was created using ArcGIS ModelBuilder and modified for automation.
+Originally created using ArcGIS ModelBuilder, the tool has been modified for automation using Python and ArcPy.
 
 ## Key Features
-- **Watertable Depth Interpolation**: Uses Inverse Distance Weighting (IDW) to interpolate watertable depths.
-- **Feature Filtering**: Removes the influence of features that affect watertable depth, ensuring more accurate results.
-- **Surface Volume Calculation**: Calculates the surface volume based on the filtered depth data.
-- **Buffer Distance Optimisation**: Identifies the best buffer distance by testing various distances and logging the results.
 
-## Example Output
-The output is a .txt file with the buffer and volume. It will look like this:
+- **Watertable Depth Interpolation**: Uses Inverse Distance Weighting (IDW) to interpolate watertable depths from shapefile point data.
+- **Channel Influence Filtering**: Filters out depths located within a given buffer of `SUPPLY` and `ESCAPE` channel features.
+- **Masking & Clipping**: Uses a spatial mask to ensure only relevant areas are analyzed.
+- **Surface Volume Calculation**: Computes the surface volume below the interpolated depth surface.
+- **Automated Buffer Testing**: Loops through multiple buffer distances to evaluate their impact and logs the results.
+
+## Output
+
+The tool creates a text file (`output.txt`) inside the specified `data_dir`. This file contains two columns:
+- **Buffer**: The buffer distance in map units (e.g., meters)
+- **Volume**: The corresponding volume calculated from the depth interpolation.
+
+If the output file does not exist or is empty when the tool is run, a heading row (`Buffer Volume`) is automatically written at the top.
+
+### Example Output
 
 ```
-0	1916113334
-10	1755721866
-20	1762712317
+Buffer Volume
+0 1916113334
+10 1755721866
+20 1762712317
 ```
