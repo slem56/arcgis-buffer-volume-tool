@@ -1,81 +1,94 @@
-"""
-Automated ArcGIS workflow to:
-- Filter features within a mask
-- Perform IDW interpolation
-- Extract raster by mask
-- Calculate surface volume
-- Log output volume and area for each buffer distance
-
-Created using ArcGIS ModelBuilder and modified for automation.
-"""
 import arcpy
 from arcpy.sa import *
 import os
 
-base_path = "path/to/data"
+def Model(Buffer, depths, channels, area_mask, data_dir):  # Modified Model function
+    """
+    Performs a geospatial volume calculation using ArcPy by excluding depth data near specified channel features.
 
-def Model(Buffer = 0):  # Model
-    print("start " + str(Buffer))
+    Args:
+        Buffer (str | float): The buffer distance (e.g., "100 Meters") used to exclude depth points located near 'SUPPLY' or 'ESCAPE' channels.
+        depths (str): Path to the depth shapefile.
+        channels (str): Path to the channels shapefile.
+        area_mask (str): Path to the area mask shapefile.
+        data_dir (str): Directory where data is stored and outputs will be saved.
 
-    # To allow overwriting outputs change overwriteOutput option to True.
+    Returns:
+        bool: True upon successful execution.
+    """
+    print(f"Start model with buffer = {Buffer}")
+
     arcpy.env.overwriteOutput = True
-
-    # Check out any necessary licenses.
     arcpy.CheckOutExtension("3D")
     arcpy.CheckOutExtension("spatial")
 
-    output_file_location = os.path.join(base_path, "output.txt")
+    output_file_location = os.path.join(data_dir, "output.txt")
+    # Write header if file doesn't exist or is empty
+    if not os.path.exists(output_file_location) or os.stat(output_file_location).st_size == 0:
+        with open(output_file_location, "w") as output_file:
+            output_file.write("Buffer Volume\n")
 
     with open(output_file_location, "a") as output_file:
         
-        depths = os.path.join(base_path, "depths.shp")
-        area_mask = os.path.join(base_path, "area_mask.shp")
-        features = os.path.join(base_path, "features.shp")
-
-        # Process: Make Feature Layer (Make Feature Layer) (management)
+        # Make Feature Layer
         Output_Layer = "depths_Layer"
         arcpy.management.MakeFeatureLayer(in_features=depths, out_layer=Output_Layer)
 
-        # Process: Select Layer By Location (Select Layer By Location) (management)
-        depths_2_, Output_Layer_Names, Count = arcpy.management.SelectLayerByLocation(in_layer=[Output_Layer], overlap_type="COMPLETELY_WITHIN", select_features=area_mask)
+        # Select depths within area mask
+        depths_2_, _, _ = arcpy.management.SelectLayerByLocation(
+            in_layer=[Output_Layer], overlap_type="COMPLETELY_WITHIN", select_features=area_mask)
 
-        # Process: Select (Select) (analysis)
-        features_Select = os.path.join(base_path, "features_Select")
-        arcpy.analysis.Select(in_features=features, out_feature_class=features_Select, where_clause="CHAN_TYPE = 'SUPPLY' Or CHAN_TYPE = 'ESCAPE'")
+        # Select SUPPLY and ESCAPE channels
+        channels_Select = "channels_Select"
+        arcpy.analysis.Select(
+            in_features=channels,
+            out_feature_class=channels_Select,
+            where_clause="CHAN_TYPE = 'SUPPLY' Or CHAN_TYPE = 'ESCAPE'"
+        )
 
-        # Process: Select Layer By Location (2) (Select Layer By Location) (management)
-        depths_3_, Output_Layer_Names_2_, Count_2_ = arcpy.management.SelectLayerByLocation(in_layer=[depths_2_], overlap_type="WITHIN_A_DISTANCE", select_features=features_Select, search_distance=Buffer, selection_type="REMOVE_FROM_SELECTION")
+        # Remove depths within buffer of selected channels
+        depths_3_, _, _ = arcpy.management.SelectLayerByLocation(
+            in_layer=[depths_2_],
+            overlap_type="WITHIN_A_DISTANCE",
+            select_features=channels_Select,
+            search_distance=Buffer,
+            selection_type="REMOVE_FROM_SELECTION"
+        )
 
-        # Process: IDW (IDW) (sa)
-        Idw_depths = os.path.join(base_path, "Idw_depths")
-        IDW = Idw_depths
-        Idw_depths = arcpy.sa.Idw(depths_3_, "RD03alt", "204.600412805364", 2, "VARIABLE 12", "")
-        Idw_depths.save(IDW)
+        # IDW interpolation
+        Idw_output = "Idw_depths"
+        Idw_raster = arcpy.sa.Idw(depths_3_, "depth", "204.600412805364", 2, "VARIABLE 12", "")
+        Idw_raster.save(Idw_output)
 
-        # Process: Extract by Mask (Extract by Mask) (sa)
-        Output_raster = os.path.join(base_path, "Extract_Idw")
-        Extract_by_Mask = Output_raster
-        Output_raster = arcpy.sa.ExtractByMask(Idw_depths, area_mask, "INSIDE")
-        Output_raster.save(Extract_by_Mask)
+        # Extract by mask
+        Extract_output = "Extract_Idw"
+        Extracted_raster = arcpy.sa.ExtractByMask(Idw_raster, area_mask, "INSIDE")
+        Extracted_raster.save(Extract_output)
 
-        # Process: Surface Volume (Surface Volume) (3d)
-        VOL_2_txt = os.path.join(base_path, "VOL_2.txt")
-        arcpy.ddd.SurfaceVolume(in_surface=Output_raster, out_text_file=VOL_2_txt, reference_plane="BELOW")
-        
+        # Surface volume calculation
+        VOL_2_txt = os.path.join(data_dir, "VOL_2.txt")
+        arcpy.ddd.SurfaceVolume(in_surface=Extracted_raster, out_text_file=VOL_2_txt, reference_plane="BELOW")
+
         with open(VOL_2_txt, "r") as volume_file_txt:
-            volume_file = volume_file_txt.read()
-            volume_file = volume_file.split()
+            volume_file = volume_file_txt.read().split()
             volume = volume_file[-1].strip()
 
         output_file.write(f"{Buffer} {volume}\n")
-    
+
+    return True
+
 
 if __name__ == '__main__':
-    # Global Environment settings
+    # Set global environment settings
     with arcpy.EnvManager(scratchWorkspace="path/to/scratchWorkspace", workspace="path/to/workspace"):
+        data_dir = "path/to/data"
+        depths = os.path.join(data_dir, "depths.shp")
+        channels = os.path.join(data_dir, "channels.shp")
+        area_mask = os.path.join(data_dir, "area_mask.shp")
+
         Buffer = 0
         max_buffer = 500
         while Buffer < max_buffer:
-            Model(Buffer)
+            Model(Buffer, depths, channels, area_mask, data_dir)
             Buffer += 10
-            print(str(Buffer/max_buffer*100) + "%")
+            print(f"{Buffer / max_buffer * 100} %")
